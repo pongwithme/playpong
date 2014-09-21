@@ -1,0 +1,6 @@
+# Run this screenrc under the project's root
+screen -t server 0 bash -c 'echo "Launchning server"; echo "$ nodemon server/server.js"; sudo nodemon server/server.js; bash'
+split
+focus
+
+# vim:ft=bash:fdm=marker:fmr={{{,}}}:

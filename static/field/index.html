@@ -1,0 +1,229 @@
+<!DOCTYPE html> 
+<html>
+    <head>
+        <title>Pong With Me</title> 
+        <meta http-equiv="Content-Type" content="text/html; charset=utf-8"/> 
+
+        <script type="text/javascript" src="/libs/qrcodejs/qrcode.js"></script>
+
+        <script type="text/javascript" src="/libs/jquery/jquery.min.js" ></script>
+        <script type="text/javascript" src="/libs/jqueryui/jquery-ui-1.10.3.custom.min.js" ></script>
+        <link rel="stylesheet" href="/libs/jqueryui/css/trontastic/jquery-ui.css" type="text/css" /> 
+
+        <script type="text/javascript" src="/config.js" ></script>
+
+        <script src="/socket.io/socket.io.js"></script>
+        <script>
+            var socket = io.connect('http://' + 'playpong.azurewebsites.net' + '/agent');
+        </script>
+
+        <style>
+            .ui-dialog {
+                font-size: 14px;
+            }
+        </style>
+
+        <script src="./game.js" type="text/javascript"></script> 
+        <script src="./pong.js" type="text/javascript"></script>
+
+        <script type="text/javascript">
+            (function () {
+                var field_id = null;
+                var game_type = -1;
+
+                Game.ready(function() {
+                    $(window).ready(function () {
+                        var calcCanvasHeight = function () {
+                            return parseInt((95 / 100) * $(window).outerHeight());
+                        };
+
+                        var calcCanvasMarginTop = function () {
+                            return parseInt((2.5 / 100) * $(window).outerHeight());
+                        };
+
+                        $("body").prepend('<canvas id="game" style="margin-top: 0px; width: 100%; height: ' + calcCanvasHeight() + 'px;"><div id="unsupported">Sorry, this example cannot be run because your browser does not support the &lt;canvas&gt; element</div></canvas>');
+
+                        $(window).resize(function () {
+                            $("#game").css({height: calcCanvasHeight(), marginTop: calcCanvasMarginTop()});
+                        });
+
+                        pong = Game.start('game', Pong, {
+                            sound: true,
+                            stats: false,
+                            footprints: false,
+                            predictions: false,
+                            winning_score: CONFIG.winning_score || 9,
+                            on_win: function (playerNo) {
+                                $("#qr-code").remove();
+                                $("#controller_url").remove();
+
+                                if (game_type === 1) {
+                                    $("#game_status").html((playerNo === 0 ? "You Win!" : "You Lost"));
+                                    $("#dialog-message .caption").html("Players");
+                                    $("#dialog-message").dialog({
+                                        buttons: {
+                                            "Play again": function() {
+                                                pong.start(1);
+
+                                                $( this ).dialog( "close" );
+                                            }
+                                        }
+                                    });
+                                }
+
+                                if (game_type === 2) {
+                                    socket.emit("win", field_id, playerNo);
+
+                                    $("#game_status").html((playerNo === 0 ? "Left" : "Right") + " Team Wins");
+                                    $("#dialog-message .caption").html("Players Left");
+                                    $("#dialog-message").dialog({
+                                        buttons: {
+                                            "Start next round": function() {
+                                                socket.emit("start", 2);
+                                                pong.start(2);
+
+                                                setTimeout(function () {
+                                                    // avoid the risk that a certain player didn't have enough time to get ready - init scores after first second
+                                                    pong.setScore([0, 0]);
+                                                }, 1000);
+
+                                                $( this ).dialog( "close" );
+                                            }
+                                        }
+                                    });
+                                }
+                            }
+                        });
+
+                        $("#dialog-message").dialog({
+                            modal: true,
+                            position: ["center", (22 / 100) * $(window).height()],
+                            width: 400,
+                            buttons: {
+                                "Against AI": function() {
+                                    game_type = 1;
+
+                                    socket.emit("start", 1);
+                                    pong.start(1);
+
+                                    $( this ).dialog( "close" );
+                                },
+                                "Play Multiplayer": function() {
+                                    game_type = 2;
+
+                                    socket.emit("start", 2);
+                                    pong.start(2);
+
+                                    $( this ).dialog( "close" );
+                                }
+                            }
+                        });
+                    });
+                });
+
+                socket.emit("new_field");
+                
+                socket.on("field_registered", function (id) {
+                    field_id = id;
+
+                    var controller_url = "playpong.azurewebsites.net" + "/r/" + field_id;
+                    var $qrcode = $("#qr-code");
+                    var qr_size = 250;
+                    $qrcode.html("").css({"padding": "10px", "width": qr_size + "px", "background-color": "white", "margin": "15px auto"});
+                    new QRCode($qrcode.get(0), {text: controller_url, width: qr_size, height: qr_size, correctLevel: QRCode.CorrectLevel.L});
+                    $("#controller_url").html(controller_url);
+                });
+                
+                socket.on("controller_connected", function () {
+                    $("#connected_players").html(parseInt($("#connected_players").html(), 10) + 1);
+                });
+                
+                socket.on("controller_disconnected", function () {
+                    $("#connected_players").html(parseInt($("#connected_players").html(), 10) - 1);
+                });
+				
+                socket.on("direction", function (data) {
+				
+				console.log(data.speed);
+                    paddle = data.side === 0 ? pong.leftPaddle : pong.rightPaddle;
+                      paddle.changeSpeed(data.speed);
+					
+                });
+
+                socket.on("winner", function () {
+                    $("#game_status").html("We have a winner!");
+                    $("#connections_status").remove();
+
+                    $("#dialog-message").dialog({
+                        buttons: {
+                            "Try to beat the AI": function() {
+                                socket.emit("start", 1);
+                                pong.start(1);
+
+                                $( this ).dialog( "close" );
+                            }
+                        }
+                    });
+                });
+            })();
+        </script>
+    </head> 
+     
+    <body style="background-color: black; padding: 0; margin: 0; overflow: auto; text-align: center;"> 
+	
+	<style>
+	.ui-dialog-titlebar{
+	display:none;
+	}
+	
+	.ui-widget-content{
+	background:black;
+	}
+	
+	.ui-state-default, .ui-widget-content .ui-state-default, .ui-widget-header .ui-state-default{
+	background:black;
+	color:white;
+	border:solid 1px white;
+	}
+	
+	.ui-corner-all, .ui-corner-bottom, .ui-corner-right, .ui-corner-br{
+	border-radius: 0px;
+	}
+	
+	
+	.ui-widget-overlay{
+	background: none;
+	}
+	
+	.ui-front .ui-dialog{
+	margin-top:150px;
+	}
+	
+	/*
+	
+	element.style{
+	top:250px !important;
+	}
+	
+	.ui-front {
+	background:transparent;
+	border:none !important;
+	border-bottom:none !important;
+	}
+	
+	.button{
+	
+	}
+	*/
+	
+	/* top:250px; */
+	</style>
+	
+        <div id="dialog-message" title="Pong With Me" style="text-align: center; font-size: 25px; ">
+            <div id="game_status" style="font-weight: bold; top:250px;"></div>
+            <div id="qr-code">Loading QR Code...</div>
+            <span id="controller_url" style="font-weight: bold;"></span>
+            <div id="connections_status" style="text-align: center; margin-top: 10px;"><span class="caption">Connected players</span>: <span id="connected_players" style="font-weight: bold;">0</span></div>
+        </div>
+    </body> 
+</html>

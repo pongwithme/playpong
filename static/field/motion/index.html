@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="en"> 
+<head>
+  <meta charset="UTF-8">
+  <title></title>
+
+</head>
+<body>
+  <div class="main">
+     gyroB: 
+          <span id="gyroB"></span>
+		  
+		       Calculated Pos: 
+          <span id="calculatedPos"></span>
+  </div>
+  
+  <script type="text/javascript">
+    init();
+    
+    function init() {
+      if (window.DeviceOrientationEvent) {
+        // Listen for the deviceorientation event and handle the raw data
+        window.addEventListener('deviceorientation', function(eventData) {
+          // beta is the front-to-back tilt in degrees, where front is positive
+          var tiltFB = eventData.beta;
+          // write to our span
+		  g = tiltFB;
+		  var pos = ((g+90)*(810/180))+15;
+		  
+          document.getElementById("gyroB").innerHTML = Math.round(tiltFB);
+		  document.getElementById("calculatedPos").innerHTML = Math.round(pos);
+          }, false);
+      }
+    }
+    
+  </script>
+  
+  
+
+</body>
+</html>

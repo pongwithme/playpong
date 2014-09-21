@@ -1,0 +1,180 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN"
+"http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+ 
+    <head>        
+        <meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1" />        
+        <title>Multiplayer Pong</title>
+		
+
+        <meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=0" name="viewport" />
+
+        <script type="text/javascript" src="/libs/jquery/jquery.min.js" ></script>
+        <script type="text/javascript" src="/libs/jqueryui/jquery-ui-1.10.3.custom.min.js" ></script>
+
+        <script type="text/javascript" src="/config.js" ></script>
+
+        <script src="/socket.io/socket.io.js"></script>
+
+        <style type="text/css" media="screen">
+            .arrow_up, .arrow_down {
+				background-color:red;
+                background: transparent center center no-repeat url(./media/up.png);
+                background-size: contain;
+                height: 70%;
+            }
+
+            .arrow_down {
+                background-image: url(./media/down.png);
+            }
+        </style>
+        
+        <script type="text/javascript" charset="utf-8">
+        (function () {
+            var controller_side = -1;
+            var controller_id = null;
+
+            var socket = io.connect('http://' + CONFIG.domain + '/agent');
+
+            var message = function (m) {
+            console.log(m);
+            
+                $("#info div").html(m);
+            };
+
+            socket.on("disconnect", function (error) {
+                $("#connection_status").html("Disconnected");
+            });
+
+            socket.on("error", function (error) {
+                message(error.error);
+            });
+
+            socket.on("controller_registered", function (id) {
+                controller_id = id;
+
+                $("#connection_status").html("Connected");
+
+                message("Waiting for game to begin");
+            });
+
+            socket.on("round_end", function (my_team_own) {
+                controller_side = -1;
+
+                if (my_team_own === true) {
+                    message("Your team own! Waiting for next round");
+                } else {
+                    message("Your team lost :(");
+                }
+            });
+
+            socket.on("winner", function (my_team_own) {
+                message("You own the game!");
+            });
+
+            socket.on("start", function (side) {
+                if (typeof side !== 'undefined') {
+                    controller_side = side;
+                }
+
+                if (controller_side === 0) {
+                    message("&#8656; Left Team Play!");
+					$("#controller").css("background-color","red"); 
+                }
+
+                if (controller_side === 1) {
+                    message("Right Team Play! &#8658;");
+					$("#controller").css("background-color","cyan"); 
+                }
+            });
+
+            var getParameterByName = function (name) {
+                name = name.replace(/[\[]/, "\\\[").replace(/[\]]/, "\\\]");
+                var regex = new RegExp("[\\?&]" + name + "=([^&#]*)"),
+                results = regex.exec(location.search);
+                return results == null ? "" : decodeURIComponent(results[1].replace(/\+/g, " "));
+            }
+
+            $(window).ready(function () {
+                // positionElements
+                var positionElements = function () {
+                    $(".arrow_up").position({my: "center center", at: "center center", of: "#up"})  
+                    $(".arrow_down").position({my: "center center", at: "center center", of: "#down"})  
+                    $("#info").position({my: "center top", at: "center bottom", of: "#up"});
+                    $("#info div").position({my: "center center", at: "center center", of: "#info"});
+                };
+
+                positionElements();
+
+                $(window).resize(positionElements);
+
+                // register controller
+                var field_id = getParameterByName("field_id");
+                if (field_id !== "") {
+                    socket.emit("new_controller", parseInt(field_id, 10));
+                } else {
+                    handle_error("Unknown field");
+                }
+				
+				
+			window.addEventListener('deviceorientation', function(eventData) {
+          // beta is the front-to-back tilt in degrees, where front is positive
+			  var tiltFB = eventData.beta;
+			  // write to our span
+			  
+			  var angle=tiltFB;
+			  var speed=angle/20;
+			  
+			  //if (angle < 10 && angle > -10)
+			  //speed = 0;
+				
+			  
+			  //var pos = parseInt(((newg+90)*(810/180))+15);
+			  
+			  document.getElementById("measured").innerHTML = speed;
+			  //document.getElementById("calculated").innerHTML = pos;
+			  
+			  //console.log(speed);
+			  
+			  var data = {side: controller_side, speed: speed};
+			  socket.emit("direction", field_id, controller_id, data);
+          }, false);
+				
+                // forward events
+                $("#up,#down")
+                    .bind("mousedown touchstart", function (e) {
+                      //  e.preventDefault();
+                      //  socket.emit("direction", field_id, controller_id, controller_side, this.id === "up" ? 1 : -1);
+                    });
+                   // .bind("mouseup touchend", function (e) {
+                   //     e.preventDefault();
+                   //     socket.emit("direction", field_id, controller_id, controller_side, 0);
+                   // });
+            });
+        })();
+        </script>
+
+    </head>
+  
+    <body style="-webkit-touch-callout: none; -webkit-user-select: none; -khtml-user-select: none; -moz-user-select: none; -ms-user-select: none; user-select: none;">
+        <div id="header" style="position: absolute; top: 0; right: 0; left: 0; height: 20px; background-color: black; color: white; text-align: center; font-size: 18px; padding: 10px 0;font-weight: bold;font-family: sans;">Multiplayer Pong</div>
+
+        <div id="controller" style="position: absolute; top: 40px; right: 0; left: 0; bottom: 30px;
+		
+		text-align: center;">
+            <div id="up" style="position: absolute; top: 0; right: 0; left: 0; bottom: 54%;"><div class="arrow_up"></div></div>
+            <div id="info" style="height: 8%; font-weight: bold; font-family: helvetica, sans-serif; border: 1px solid #4a4a4a; background: #000000 url(/libs/jqueryui/css/trontastic/images/ui-bg_gloss-wave_55_000000_500x100.png) 50% top repeat-x; color: #ffffff;"><div>Loading...</div></div>
+            <div id="down" style="position: absolute; top: 54%; right: 0; left: 0; bottom: 0;"><div class="arrow_down"></div></div>
+        </div>
+
+        <div id="footer" style="position: absolute; bottom: 0; right: 0; left: 0; height: 22px; padding: 4px; background-color: black; color: white; font-weight: bold; color: white;">
+            <div id="temp" style="display:none">
+			Connection status: <span id="connection_status">Init...</span>
+			</div>
+
+			m: <span id="measured"></span> c: <span id="calculated"></span>
+        </div>
+    </body>
+
+</html>
